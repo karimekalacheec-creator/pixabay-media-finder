@@ -35,3 +35,27 @@ O projeto carrega automaticamente o arquivo `.env` usando `dotenv`. Também é p
 ## Licença e uso
 
 A aplicação consulta a API oficial do Pixabay. Respeite os termos da API e a licença aplicável a cada conteúdo.
+
+## Integração opcional com Meta Pages API
+
+O servidor também oferece um endpoint de leitura de insights de uma Página do Facebook que você administra:
+
+```text
+GET /api/meta/page-insights
+GET /api/meta/page-insights?metric=page_impressions_unique&page_engaged_users&period=day
+```
+
+Métricas iniciais suportadas:
+- `page_impressions_unique`: alcance único da Página.
+- `page_engaged_users`: pessoas que interagiram com a Página.
+
+### Configuração segura
+
+Cadastre estas variáveis no painel de hospedagem (Render → serviço → Environment), nunca no GitHub:
+- `META_PAGE_ID`: ID da Página do Facebook.
+- `META_PAGE_ACCESS_TOKEN`: token de acesso da Página.
+- `META_API_VERSION`: versão da Graph API (opcional; padrão `v27.0`).
+
+Para obter o ID e o token, use o [Graph API Explorer](https://developers.facebook.com/tools/explorer/). A documentação da Meta orienta consultar `me/accounts?fields=name,id,access_token,tasks` e conceder `pages_show_list`, `pages_read_engagement` e `read_insights`. A pessoa autenticada precisa ter a tarefa `ANALYZE` na Página.
+
+**Importante:** o token é um segredo. Não o coloque em arquivos, commits, issues ou mensagens. A disponibilidade dos insights depende das permissões concedidas, do tipo de Página e das regras de acesso/revisão da Meta.
