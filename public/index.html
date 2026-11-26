@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Pesquise fotos e vídeos gratuitos no Pixabay.">
+  <title>Pixabay — Busca de mídia</title>
+  <style>
+    :root { color-scheme: light; font-family: Inter, system-ui, Arial, sans-serif; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #f5f7f8; color: #18212b; }
+    header { padding: 42px 20px 32px; background: #173d32; color: white; text-align: center; }
+    h1 { margin: 0 0 8px; font-size: clamp(1.8rem, 4vw, 2.7rem); }
+    header p { margin: 0; color: #d5e5dd; }
+    main { max-width: 1120px; margin: 0 auto; padding: 26px 18px 60px; }
+    form { display: flex; flex-wrap: wrap; gap: 10px; max-width: 760px; margin: 0 auto 18px; }
+    input, select, button { font: inherit; border-radius: 10px; padding: 13px 14px; border: 1px solid #cbd5d1; }
+    input { flex: 1 1 260px; min-width: 0; background: white; }
+    select { background: white; }
+    button { background: #237a58; color: white; border: 0; cursor: pointer; font-weight: 650; }
+    button:disabled { opacity: .6; cursor: wait; }
+    #status { min-height: 28px; text-align: center; color: #52615a; margin: 12px 0 22px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 16px; }
+    .item { overflow: hidden; border-radius: 13px; background: white; box-shadow: 0 3px 14px #17251b12; }
+    .item img, .item video { width: 100%; height: 190px; object-fit: cover; display: block; background: #e7ece9; }
+    .meta { padding: 12px; display: flex; justify-content: space-between; align-items: center; gap: 10px; font-size: .9rem; }
+    .meta a { color: #176044; font-weight: 650; text-decoration: none; }
+    .meta span { color: #66736d; }
+    .pager { display: flex; justify-content: center; gap: 10px; margin-top: 24px; }
+    .pager button { min-width: 110px; }
+    footer { text-align: center; color: #68756f; padding: 20px; font-size: .85rem; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Encontre imagens e vídeos</h1>
+    <p>Pesquise mídia no Pixabay em um só lugar.</p>
+  </header>
+  <main>
+    <form id="searchForm">
+      <input id="query" type="search" placeholder="Ex.: natureza, negócios, praia..." minlength="2" maxlength="100" required>
+      <select id="kind" aria-label="Tipo de mídia">
+        <option value="images">Imagens</option>
+        <option value="videos">Vídeos</option>
+      </select>
+      <button id="submit" type="submit">Pesquisar</button>
+    </form>
+    <div id="status" role="status">Digite um tema para começar.</div>
+    <section id="results" class="grid" aria-live="polite"></section>
+    <div class="pager">
+      <button id="prev" type="button" disabled>Anterior</button>
+      <button id="next" type="button" disabled>Próxima</button>
+    </div>
+  </main>
+  <footer>Resultados fornecidos pelo Pixabay. Verifique a licença e as condições de uso de cada conteúdo.</footer>
+  <script>
+    const form = document.querySelector("#searchForm");
+    const query = document.querySelector("#query");
+    const kind = document.querySelector("#kind");
+    const statusBox = document.querySelector("#status");
+    const results = document.querySelector("#results");
+    const submit = document.querySelector("#submit");
+    const prev = document.querySelector("#prev");
+    const next = document.querySelector("#next");
+    let page = 1, total = 0;
+
+    function element(tag, cls, text) {
+      const el = document.createElement(tag);
+      if (cls) el.className = cls;
+      if (text !== undefined) el.textContent = text;
+      return el;
+    }
+
+    function card(item, type) {
+      const article = element("article", "item");
+      let media;
+      if (type === "videos") {
+        media = document.createElement("video");
+        media.src = item.videos?.medium?.url || item.videos?.small?.url || "";
+        media.poster = item.picture_id ? `https://i.vimeocdn.com/video/${item.picture_id}_640x360.jpg` : "";
+        media.controls = true;
+        media.preload = "metadata";
+      } else {
+        media = document.createElement("img");
+        media.src = item.webformatURL || item.previewURL || "";
+        media.alt = item.tags || "Imagem do Pixabay";
+        media.loading = "lazy";
+      }
+      article.append(media);
+      const meta = element("div", "meta");
+      const link = element("a", "", "Ver no Pixabay");
+      link.href = item.pageURL || "https://pixabay.com/";
+      link.target = "_blank";
+      link.rel = "noopener noreferrer";
+      const by = element("span", "", item.user ? `Por ${item.user}` : "Pixabay");
+      meta.append(link, by);
+      article.append(meta);
+      return article;
+    }
+
+    async function search() {
+      const q = query.value.trim();
+      if (q.length < 2) return;
+      submit.disabled = true;
+      statusBox.textContent = "Buscando no Pixabay…";
+      results.replaceChildren();
+      try {
+        const response = await fetch(`/api/search?q=${encodeURIComponent(q)}&type=${kind.value}&page=${page}`);
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || "Erro na pesquisa.");
+        const hits = data.hits || [];
+        total = data.totalHits || 0;
+        if (!hits.length) statusBox.textContent = "Nenhum resultado encontrado. Tente outro termo.";
+        else {
+          statusBox.textContent = `${total.toLocaleString("pt-BR")} resultados encontrados. Exibindo ${hits.length}.`;
+          hits.forEach(item => results.append(card(item, kind.value)));
+        }
+        prev.disabled = page <= 1;
+        next.disabled = page >= Math.ceil(total / 24) || hits.length === 0;
+      } catch (err) {
+        statusBox.textContent = err.message;
+        prev.disabled = next.disabled = true;
+      } finally {
+        submit.disabled = false;
+      }
+    }
+
+    form.addEventListener("submit", e => { e.preventDefault(); page = 1; search(); });
+    prev.addEventListener("click", () => { if (page > 1) { page--; search(); } });
+    next.addEventListener("click", () => { page++; search(); });
+  </script>
+</body>
+</html>
