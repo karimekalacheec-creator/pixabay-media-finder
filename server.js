@@ -7,6 +7,9 @@ import { fileURLToPath } from "node:url";
 const ROOT = fileURLToPath(new URL(".", import.meta.url));
 const PORT = Number(process.env.PORT || 3000);
 const API_KEY = process.env.PIXABAY_API_KEY;
+const META_PAGE_ID = process.env.META_PAGE_ID;
+const META_PAGE_ACCESS_TOKEN = process.env.META_PAGE_ACCESS_TOKEN;
+const META_API_VERSION = process.env.META_API_VERSION || "v27.0";
 
 const mime = {
   ".html": "text/html; charset=utf-8",
@@ -22,6 +25,48 @@ function send(res, status, data, type = "application/json; charset=utf-8") {
 
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://${req.headers.host || "localhost"}`);
+
+  if (url.pathname === "/api/meta/page-insights") {
+    if (!META_PAGE_ID || !META_PAGE_ACCESS_TOKEN) {
+      return send(res, 503, {
+        error: "Configure META_PAGE_ID e META_PAGE_ACCESS_TOKEN nas variáveis de ambiente."
+      });
+    }
+
+    const allowedMetrics = new Set(["page_impressions_unique", "page_engaged_users"]);
+    const requestedMetrics = (url.searchParams.get("metric") || "page_impressions_unique,page_engaged_users")
+      .split(",").map(value => value.trim()).filter(Boolean);
+    const metrics = [...new Set(requestedMetrics)].filter(metric => allowedMetrics.has(metric));
+    const period = url.searchParams.get("period") || "day";
+
+    if (metrics.length === 0 || metrics.length !== new Set(requestedMetrics).size) {
+      return send(res, 400, {
+        error: "Métricas permitidas: page_impressions_unique e page_engaged_users."
+      });
+    }
+    if (!["day", "week", "days_28"].includes(period)) {
+      return send(res, 400, { error: "Período permitido: day, week ou days_28." });
+    }
+
+    try {
+      const endpoint = new URL(`https://graph.facebook.com/${META_API_VERSION}/${encodeURIComponent(META_PAGE_ID)}/insights`);
+      endpoint.searchParams.set("metric", metrics.join(","));
+      endpoint.searchParams.set("period", period);
+      const response = await fetch(endpoint, {
+        headers: { Authorization: `Bearer ${META_PAGE_ACCESS_TOKEN}` }
+      });
+      const data = await response.json();
+      if (!response.ok || data.error) {
+        console.error("Meta API error:", data.error?.message || response.status);
+        return send(res, response.status || 502, {
+          error: data.error?.message || "A Meta API não conseguiu retornar os insights. Verifique token, permissões e versão."
+        });
+      }
+      return send(res, 200, data);
+    } catch {
+      return send(res, 502, { error: "Não foi possível acessar a Meta API agora." });
+    }
+  }
 
   if (url.pathname === "/api/search") {
     if (!API_KEY) return send(res, 503, { error: "Configure PIXABAY_API_KEY nas variáveis de ambiente." });
