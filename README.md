@@ -86,8 +86,10 @@ Para testar primeiro a vinculação, abra `/api/meta/instagram-account` no domí
 O servidor pode consultar as organizações e os canais conectados ao Buffer e criar publicações na fila ou em um horário específico.
 
 Configure no Render, em **Environment**:
-- `BUFFER_API_KEY`: chave pessoal criada em Buffer → Settings → API.
-- `BUFFER_PUBLISH_SECRET`: segredo próprio e longo para proteger a rota que cria publicações. Gere um valor aleatório e não o publique no GitHub.
+- `BUFFER_API_KEY`: chave pessoal criada em Buffer → Settings → API. É a única variável que você precisa preencher manualmente.
+- `BUFFER_PUBLISH_SECRET`: o Blueprint do Render gera esse segredo automaticamente durante a criação do serviço. Se o serviço já existir e a variável não tiver sido criada, gere um valor aleatório no Render; não o publique no GitHub.
+
+Ao configurar o Blueprint pela primeira vez, o Render solicitará somente o valor de `BUFFER_API_KEY`; o segredo de publicação será gerado automaticamente.
 
 Rotas:
 - `GET /api/buffer/connection-check`: verifica a chave e informa apenas a quantidade de organizações e canais conectados.
