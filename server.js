@@ -3,6 +3,7 @@ import http from "node:http";
 import { readFile } from "node:fs/promises";
 import { extname, join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
+import { timingSafeEqual } from "node:crypto";
 
 const ROOT = fileURLToPath(new URL(".", import.meta.url));
 const PORT = Number(process.env.PORT || 3000);
@@ -47,7 +48,7 @@ function hasValidPublishSecret(req) {
   if (typeof supplied !== "string" || !BUFFER_PUBLISH_SECRET) return false;
   const a = Buffer.from(supplied);
   const b = Buffer.from(BUFFER_PUBLISH_SECRET);
-  return a.length === b.length && require("node:crypto").timingSafeEqual(a, b);
+  return a.length === b.length && timingSafeEqual(a, b);
 }
 
 const server = http.createServer(async (req, res) => {
@@ -145,7 +146,7 @@ const server = http.createServer(async (req, res) => {
         `schedulingType: ${schedulingType}`,
         `mode: ${mode}`,
         ...(mode === "customScheduled" ? [`dueAt: ${JSON.stringify(new Date(dueAt).toISOString())}`] : [])
-      ].join("\\n");
+      ].join("\n");
       const result = await bufferGraphQL(`
         mutation CreateBufferPost {
           createPost(input: {
