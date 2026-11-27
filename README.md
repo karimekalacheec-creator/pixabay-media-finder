@@ -42,12 +42,12 @@ O servidor também oferece um endpoint de leitura de insights de uma Página do 
 
 ```text
 GET /api/meta/page-insights
-GET /api/meta/page-insights?metric=page_impressions,page_post_engagements&period=day
+GET /api/meta/page-insights?metric=page_impressions_unique,page_engaged_users&period=day
 ```
 
 Métricas iniciais suportadas:
-- `page_impressions`: número de vezes que conteúdos da Página apareceram na tela.
-- `page_post_engagements`: interações com publicações, incluindo reações, comentários e compartilhamentos.
+- `page_impressions_unique`: número de pessoas únicas que viram conteúdo da Página.
+- `page_engaged_users`: número de pessoas que interagiram com a Página.
 
 ### Configuração segura
 
