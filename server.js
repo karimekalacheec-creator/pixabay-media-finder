@@ -26,6 +26,59 @@ function send(res, status, data, type = "application/json; charset=utf-8") {
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://${req.headers.host || "localhost"}`);
 
+  if (url.pathname === "/api/meta/connection-check") {
+    const configured = {
+      pageId: Boolean(META_PAGE_ID),
+      pageAccessToken: Boolean(META_PAGE_ACCESS_TOKEN)
+    };
+
+    if (!META_PAGE_ID || !META_PAGE_ACCESS_TOKEN) {
+      return send(res, 503, {
+        connected: false,
+        configured,
+        message: "Faltam META_PAGE_ID e/ou META_PAGE_ACCESS_TOKEN nas variáveis privadas do serviço."
+      });
+    }
+
+    try {
+      const endpoint = new URL(`https://graph.facebook.com/${META_API_VERSION}/me`);
+      endpoint.searchParams.set("fields", "id,name");
+      const response = await fetch(endpoint, {
+        headers: { Authorization: `Bearer ${META_PAGE_ACCESS_TOKEN}` }
+      });
+      const data = await response.json();
+
+      if (!response.ok || data.error) {
+        return send(res, 502, {
+          connected: false,
+          configured,
+          error: {
+            message: data.error?.message || "A Meta recusou o token.",
+            code: data.error?.code ?? null,
+            subcode: data.error?.error_subcode ?? null
+          }
+        });
+      }
+
+      const tokenPageMatches = String(data.id) === String(META_PAGE_ID);
+      return send(res, tokenPageMatches ? 200 : 409, {
+        connected: tokenPageMatches,
+        configured,
+        page: { id: data.id, name: data.name || null },
+        pageIdMatchesToken: tokenPageMatches,
+        message: tokenPageMatches
+          ? "Token válido e associado à Página configurada."
+          : "O token é válido, mas pertence a uma Página diferente do META_PAGE_ID configurado."
+      });
+    } catch {
+      return send(res, 502, {
+        connected: false,
+        configured,
+        message: "Não foi possível acessar a Meta API agora."
+      });
+    }
+  }
+
   if (url.pathname === "/api/meta/page-insights") {
     if (!META_PAGE_ID || !META_PAGE_ACCESS_TOKEN) {
       return send(res, 503, {
@@ -59,7 +112,9 @@ const server = http.createServer(async (req, res) => {
       if (!response.ok || data.error) {
         console.error("Meta API error:", data.error?.message || response.status);
         return send(res, response.status || 502, {
-          error: data.error?.message || "A Meta API não conseguiu retornar os insights. Verifique token, permissões e versão."
+          error: data.error?.message || "A Meta API não conseguiu retornar os insights. Verifique token, permissões e versão.",
+          code: data.error?.code ?? null,
+          subcode: data.error?.error_subcode ?? null
         });
       }
       return send(res, 200, data);
