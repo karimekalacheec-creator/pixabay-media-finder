@@ -10,6 +10,8 @@ const API_KEY = process.env.PIXABAY_API_KEY;
 const META_PAGE_ID = process.env.META_PAGE_ID;
 const META_PAGE_ACCESS_TOKEN = process.env.META_PAGE_ACCESS_TOKEN;
 const META_API_VERSION = process.env.META_API_VERSION || "v27.0";
+const BUFFER_API_KEY = process.env.BUFFER_API_KEY;
+const BUFFER_PUBLISH_SECRET = process.env.BUFFER_PUBLISH_SECRET;
 
 const mime = {
   ".html": "text/html; charset=utf-8",
@@ -23,8 +25,150 @@ function send(res, status, data, type = "application/json; charset=utf-8") {
   res.end(typeof data === "string" ? data : JSON.stringify(data));
 }
 
+async function bufferGraphQL(query) {
+  const response = await fetch("https://api.buffer.com", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${BUFFER_API_KEY}`
+    },
+    body: JSON.stringify({ query })
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok || payload.errors?.length) {
+    const message = payload.errors?.map(error => error.message).filter(Boolean).join("; ");
+    throw new Error(message || `Buffer API respondeu com status ${response.status}.`);
+  }
+  return payload.data || {};
+}
+
+function hasValidPublishSecret(req) {
+  const supplied = req.headers["x-publish-secret"];
+  if (typeof supplied !== "string" || !BUFFER_PUBLISH_SECRET) return false;
+  const a = Buffer.from(supplied);
+  const b = Buffer.from(BUFFER_PUBLISH_SECRET);
+  return a.length === b.length && require("node:crypto").timingSafeEqual(a, b);
+}
+
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://${req.headers.host || "localhost"}`);
+
+  if (url.pathname === "/api/buffer/connection-check" && req.method === "GET") {
+    if (!BUFFER_API_KEY) {
+      return send(res, 503, {
+        connected: false,
+        message: "Configure BUFFER_API_KEY nas variáveis privadas do Render."
+      });
+    }
+    try {
+      const accountData = await bufferGraphQL(`
+        query BufferAccount {
+          account {
+            id
+            name
+            organizations {
+              id
+              name
+            }
+          }
+        }
+      `);
+      const account = accountData.account;
+      if (!account) throw new Error("A Buffer não retornou os dados da conta.");
+      const organizations = await Promise.all((account.organizations || []).map(async organization => {
+        const safeId = JSON.stringify(organization.id);
+        const channelData = await bufferGraphQL(`
+          query BufferChannels {
+            channels(input: { organizationId: ${safeId} }) {
+              id
+              name
+              displayName
+              service
+              descriptor
+              isDisconnected
+              isLocked
+            }
+          }
+        `);
+        return {
+          id: organization.id,
+          name: organization.name,
+          channels: channelData.channels || []
+        };
+      }));
+      return send(res, 200, {
+        connected: true,
+        account: { id: account.id, name: account.name || null },
+        organizations
+      });
+    } catch (error) {
+      return send(res, 502, {
+        connected: false,
+        message: error.message || "Não foi possível consultar a Buffer API."
+      });
+    }
+  }
+
+  if (url.pathname === "/api/buffer/posts" && req.method === "POST") {
+    if (!BUFFER_API_KEY) {
+      return send(res, 503, { error: "Configure BUFFER_API_KEY nas variáveis privadas do Render." });
+    }
+    if (!hasValidPublishSecret(req)) {
+      return send(res, 401, { error: "Acesso não autorizado." });
+    }
+    try {
+      let rawBody = "";
+      for await (const chunk of req) {
+        rawBody += chunk;
+        if (rawBody.length > 20000) return send(res, 413, { error: "Conteúdo muito grande." });
+      }
+      const body = JSON.parse(rawBody || "{}");
+      const { channelId, text, mode = "addToQueue", schedulingType = "automatic", dueAt } = body;
+      if (typeof channelId !== "string" || !channelId.trim()) {
+        return send(res, 400, { error: "Informe o channelId do perfil de destino." });
+      }
+      if (typeof text !== "string" || !text.trim() || text.length > 5000) {
+        return send(res, 400, { error: "O texto é obrigatório e deve ter no máximo 5.000 caracteres." });
+      }
+      if (!["addToQueue", "customScheduled"].includes(mode)) {
+        return send(res, 400, { error: "mode deve ser addToQueue ou customScheduled." });
+      }
+      if (!["automatic", "notification"].includes(schedulingType)) {
+        return send(res, 400, { error: "schedulingType deve ser automatic ou notification." });
+      }
+      if (mode === "customScheduled" && (!dueAt || Number.isNaN(Date.parse(dueAt)))) {
+        return send(res, 400, { error: "Informe dueAt em formato de data ISO válido para agendamento personalizado." });
+      }
+      const input = [
+        `text: ${JSON.stringify(text)}`,
+        `channelId: ${JSON.stringify(channelId)}`,
+        `schedulingType: ${schedulingType}`,
+        `mode: ${mode}`,
+        ...(mode === "customScheduled" ? [`dueAt: ${JSON.stringify(new Date(dueAt).toISOString())}`] : [])
+      ].join("\\n");
+      const result = await bufferGraphQL(`
+        mutation CreateBufferPost {
+          createPost(input: {
+            ${input}
+          }) {
+            ... on PostActionSuccess {
+              post { id text dueAt status }
+            }
+            ... on MutationError {
+              message
+            }
+          }
+        }
+      `);
+      const action = result.createPost;
+      if (action?.message || !action?.post) {
+        return send(res, 422, { created: false, error: action?.message || "A Buffer não confirmou a criação da publicação." });
+      }
+      return send(res, 201, { created: true, post: action.post });
+    } catch (error) {
+      return send(res, 502, { created: false, error: error.message || "Falha ao criar publicação na Buffer." });
+    }
+  }
 
   if (url.pathname === "/api/meta/connection-check") {
     const configured = {
