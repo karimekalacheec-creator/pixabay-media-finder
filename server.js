@@ -190,15 +190,15 @@ const server = http.createServer(async (req, res) => {
       });
     }
 
-    const allowedMetrics = new Set(["page_impressions", "page_post_engagements"]);
-    const requestedMetrics = (url.searchParams.get("metric") || "page_impressions,page_post_engagements")
+    const allowedMetrics = new Set(["page_impressions_unique", "page_engaged_users"]);
+    const requestedMetrics = (url.searchParams.get("metric") || "page_impressions_unique,page_engaged_users")
       .split(",").map(value => value.trim()).filter(Boolean);
     const metrics = [...new Set(requestedMetrics)].filter(metric => allowedMetrics.has(metric));
     const period = url.searchParams.get("period") || "day";
 
     if (metrics.length === 0 || metrics.length !== new Set(requestedMetrics).size) {
       return send(res, 400, {
-        error: "Métricas permitidas: page_impressions e page_post_engagements."
+        error: "Métricas permitidas: page_impressions_unique e page_engaged_users."
       });
     }
     if (!["day", "week", "days_28"].includes(period)) {
