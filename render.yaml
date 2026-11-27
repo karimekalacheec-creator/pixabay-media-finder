@@ -8,3 +8,7 @@ services:
     envVars:
       - key: PIXABAY_API_KEY
         sync: false
+      - key: BUFFER_API_KEY
+        sync: false
+      - key: BUFFER_PUBLISH_SECRET
+        sync: false
