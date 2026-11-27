@@ -90,7 +90,7 @@ Configure no Render, em **Environment**:
 - `BUFFER_PUBLISH_SECRET`: segredo próprio e longo para proteger a rota que cria publicações. Gere um valor aleatório e não o publique no GitHub.
 
 Rotas:
-- `GET /api/buffer/connection-check`: verifica a chave e lista organizações/canais conectados.
+- `GET /api/buffer/connection-check`: verifica a chave e informa apenas a quantidade de organizações e canais conectados.
 - `POST /api/buffer/posts`: cria uma publicação. Exige o cabeçalho `x-publish-secret` com o valor de `BUFFER_PUBLISH_SECRET` e um JSON com `channelId` e `text`. Opcionalmente aceita `mode` (`addToQueue` ou `customScheduled`), `schedulingType` (`automatic` ou `notification`) e `dueAt` (data ISO quando `mode` for `customScheduled`).
 
 **Atenção:** o tipo de agendamento precisa ser compatível com o canal (por exemplo, perfis pessoais do Instagram exigem publicação por notificação). A API key e o segredo de publicação nunca devem ser enviados ao navegador nem incluídos em commits.
