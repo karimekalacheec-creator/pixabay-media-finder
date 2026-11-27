@@ -97,10 +97,11 @@ const server = http.createServer(async (req, res) => {
           channels: channelData.channels || []
         };
       }));
+      const channelCount = organizations.reduce((total, organization) => total + organization.channels.length, 0);
       return send(res, 200, {
         connected: true,
-        account: { id: account.id, name: account.name || null },
-        organizations
+        organizationCount: organizations.length,
+        channelCount
       });
     } catch (error) {
       return send(res, 502, {
