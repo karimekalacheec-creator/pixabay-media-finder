@@ -79,3 +79,18 @@ A integração usa `META_PAGE_ID` e `META_PAGE_ACCESS_TOKEN` já configurados no
 Para testar primeiro a vinculação, abra `/api/meta/instagram-account` no domínio publicado. Se retornar que não há conta vinculada, conecte a conta profissional do Instagram à Página no Meta Business Suite. Se retornar erro de permissão, revise as permissões concedidas ao token no app da Meta.
 
 **Segurança:** nunca coloque tokens reais em arquivos do GitHub, no navegador ou em mensagens. Cadastre-os somente nas variáveis privadas do serviço de hospedagem.
+
+
+## Integração com Buffer API
+
+O servidor pode consultar as organizações e os canais conectados ao Buffer e criar publicações na fila ou em um horário específico.
+
+Configure no Render, em **Environment**:
+- `BUFFER_API_KEY`: chave pessoal criada em Buffer → Settings → API.
+- `BUFFER_PUBLISH_SECRET`: segredo próprio e longo para proteger a rota que cria publicações. Gere um valor aleatório e não o publique no GitHub.
+
+Rotas:
+- `GET /api/buffer/connection-check`: verifica a chave e lista organizações/canais conectados.
+- `POST /api/buffer/posts`: cria uma publicação. Exige o cabeçalho `x-publish-secret` com o valor de `BUFFER_PUBLISH_SECRET` e um JSON com `channelId` e `text`. Opcionalmente aceita `mode` (`addToQueue` ou `customScheduled`), `schedulingType` (`automatic` ou `notification`) e `dueAt` (data ISO quando `mode` for `customScheduled`).
+
+**Atenção:** o tipo de agendamento precisa ser compatível com o canal (por exemplo, perfis pessoais do Instagram exigem publicação por notificação). A API key e o segredo de publicação nunca devem ser enviados ao navegador nem incluídos em commits.
