@@ -59,3 +59,23 @@ Cadastre estas variáveis no painel de hospedagem (Render → serviço → Envir
 Para obter o ID e o token, use o [Graph API Explorer](https://developers.facebook.com/tools/explorer/). A documentação da Meta orienta consultar `me/accounts?fields=name,id,access_token,tasks` e conceder `pages_show_list`, `pages_read_engagement` e `read_insights`. A pessoa autenticada precisa ter a tarefa `ANALYZE` na Página.
 
 **Importante:** o token é um segredo. Não o coloque em arquivos, commits, issues ou mensagens. A disponibilidade dos insights depende das permissões concedidas, do tipo de Página e das regras de acesso/revisão da Meta.
+
+
+## Integração com Instagram (Meta Graph API)
+
+A API oferece duas rotas adicionais:
+
+- `GET /api/meta/instagram-account`: verifica se a Página configurada tem uma conta profissional do Instagram vinculada e retorna o ID e o nome de usuário.
+- `GET /api/meta/instagram-insights`: consulta métricas da conta profissional vinculada.
+
+Exemplo de consulta:
+
+```text
+/api/meta/instagram-insights?metric=reach,profile_views,accounts_engaged,total_interactions&period=day
+```
+
+A integração usa `META_PAGE_ID` e `META_PAGE_ACCESS_TOKEN` já configurados no ambiente privado do servidor. A Página precisa estar vinculada a uma conta profissional do Instagram (Business ou Creator), e o token precisa ter as permissões exigidas pela Meta, incluindo `instagram_basic`, `instagram_manage_insights` e `pages_read_engagement`, além do acesso/tarefa apropriados à Página.
+
+Para testar primeiro a vinculação, abra `/api/meta/instagram-account` no domínio publicado. Se retornar que não há conta vinculada, conecte a conta profissional do Instagram à Página no Meta Business Suite. Se retornar erro de permissão, revise as permissões concedidas ao token no app da Meta.
+
+**Segurança:** nunca coloque tokens reais em arquivos do GitHub, no navegador ou em mensagens. Cadastre-os somente nas variáveis privadas do serviço de hospedagem.
